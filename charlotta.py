@@ -11,15 +11,15 @@ def reveal(text, delay=0.05):
 
 # Define base multipliers
 POKEBALL_MULTIPLIER = 1.0
-MEDAL_MULTIPLIER = 5.0
+MEDAL_MULTIPLIER = 1.0
 
 # Define Pokémon with their attributes
 # catch_rate and flee_rate are percentages between 0.1 and 100.
 pokemon_data = {
-    "Chansey": {"type": "Normal", "catch_rate": 99.0, "flee_rate": 1.0},
-    "Eevee": {"type": "Normal", "catch_rate": 50.0, "flee_rate": 20.0},
-    "Mimikyu": {"type": "Ghost/Fairy", "catch_rate": 25.0, "flee_rate": 30.0},
-    "Rayquaza": {"type": "Flying/Dragon", "catch_rate": 15.0, "flee_rate": 60.0}
+    "Chansey": {"type": "Normal", "catch_rate": 95.0, "flee_rate": 2.0},
+    "Eevee": {"type": "Normal", "catch_rate": 85.0, "flee_rate": 5.0},
+    "Mimikyu": {"type": "Ghost/Fairy", "catch_rate": 75.0, "flee_rate": 20.0},
+    "Rayquaza": {"type": "Flying/Dragon", "catch_rate": 15.0, "flee_rate": 30.0}
 }
 
 # Spawn probabilities (weights) - for example, Rayquaza is the rarest.
@@ -27,7 +27,7 @@ spawn_weights = {
     "Chansey": 50,
     "Eevee": 35,
     "Mimikyu": 10,
-    "Rayquaza": 50000000000
+    "Rayquaza": 5
 }
 
 def choose_pokemon():
@@ -45,24 +45,25 @@ def simulate_throw(pokemon, throw_type, cumulative_flee):
     """
     # Determine throw adjustments based on the user's input.
     # For throw_type, the user enters:
-    # "1" for Throw Lightly, "2" for Throw Precisely, "3" for Throw Desperately.
+    # "1" for Throw Lightly, "2" for Throw Precisely,
+    # "3" for Throw Masterfully, and "4" for Throw Desperately.
     if throw_type == "1":
-        # Lightly: half the pokeball multiplier; no extra flee adjustment.
-        catch_multiplier = POKEBALL_MULTIPLIER * 1
+        # Lightly: base multiplier; no extra flee adjustment.
+        catch_multiplier = POKEBALL_MULTIPLIER * 1.0
         throw_flee_adjust = 0.0
         throw_name = "lightly"
     elif throw_type == "2":
-        # Precisely: reduce catch multiplier by 20%; add 5% extra flee rate.
+        # Precisely: slightly higher multiplier; add a moderate flee adjustment.
         catch_multiplier = POKEBALL_MULTIPLIER * 1.1
         throw_flee_adjust = 5.0
         throw_name = "precisely"
     elif throw_type == "3":
-        # Precisely: reduce catch multiplier by 20%; add 5% extra flee rate.
+        # Masterfully: even higher multiplier; same flee adjustment as precisely.
         catch_multiplier = POKEBALL_MULTIPLIER * 1.5
         throw_flee_adjust = 5.0
         throw_name = "masterfully"
     elif throw_type == "4":
-        # Desperately: increase catch multiplier by 10%; add 20% extra flee rate.
+        # Desperately: highest multiplier; add a large extra flee adjustment.
         catch_multiplier = POKEBALL_MULTIPLIER * 2.0
         throw_flee_adjust = 20.0
         throw_name = "desperately"
@@ -76,7 +77,6 @@ def simulate_throw(pokemon, throw_type, cumulative_flee):
     effective_multiplier = catch_multiplier + MEDAL_MULTIPLIER
 
     # Calculate effective catch and flee chances.
-    # The effective flee chance uses the Pokémon's base flee rate plus the throw's adjustment and the cumulative flee from previous attempts.
     effective_catch_chance = pokemon["catch_rate"] * effective_multiplier
     effective_flee_chance = pokemon["flee_rate"] + throw_flee_adjust + cumulative_flee
 
@@ -97,20 +97,24 @@ def simulate_throw(pokemon, throw_type, cumulative_flee):
         elif i == 3:
             shake_label = "SHAKE THRICE"
         reveal(f"\n{shake_label}...")
-        # Each shake has its own random roll.
-        roll = random.uniform(0, 100)
-        reveal(f"Roll: {roll:.2f}")
-        # Check for flee first.
-        if roll <= effective_flee_chance:
-            reveal("Oh no! It triggered a flee!")
-            return "fled", throw_flee_adjust
-        # Then check if the shake is secure (roll falls within catch chance).
-        elif roll > effective_catch_chance:
-            reveal("The Pokémon wiggled free from the ball!")
-            return "break out", throw_flee_adjust
-        else:
+
+        # First, roll for a catch.
+        catch_roll = random.uniform(0, 100)
+        reveal(f"Catch Roll: {catch_roll:.2f}")
+        if catch_roll <= effective_catch_chance:
             reveal("The shake was secure!")
-    # If all three shakes pass, the Pokémon is caught.
+            continue  # Proceed to next shake.
+        else:
+            reveal("The Pokémon wiggled free from the ball!")
+            # Only roll for flee if the catch roll fails.
+            flee_roll = random.uniform(0, 100)
+            reveal(f"Flee Roll: {flee_roll:.2f}")
+            if flee_roll <= effective_flee_chance:
+                # reveal("The pokemo")
+                return "fled", throw_flee_adjust
+            else:
+                return "break out", throw_flee_adjust
+    # If all three shakes produce a secure catch roll, then the Pokémon is caught.
     return "caught", throw_flee_adjust
 
 def main():
@@ -144,9 +148,7 @@ def main():
             if attempt_count >= 1:
                 cumulative_flee += throw_flee_adjust
             else:
-                # After the first failed attempt, set cumulative flee to the throw's adjustment.
                 cumulative_flee = throw_flee_adjust
-            # Cap cumulative flee at 100.
             cumulative_flee = min(cumulative_flee, 100.0)
             attempt_count += 1
 
