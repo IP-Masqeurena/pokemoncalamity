@@ -2,6 +2,8 @@ import random
 import sys
 import time
 
+remaining_pokeballs = 0
+
 def reveal(text, delay=0.05):
     for char in text:
         sys.stdout.write(char)
@@ -29,7 +31,7 @@ spawn_weights = {
     "Eevee": 35,
     "Mimikyu": 10,
     "Rayquaza": 5,
-    "Ditto":  15000000000000000000
+    "Ditto":  15,
 }
 
 def choose_pokemon():
@@ -119,21 +121,29 @@ def simulate_throw(pokemon, throw_type, cumulative_flee):
                 return "break out", throw_flee_adjust
     return "caught", throw_flee_adjust
 
-def main():
+def catch_pokemon(available_pokeballs):
+    global remaining_pokeballs
+    remaining_pokeballs = available_pokeballs
+    
     reveal("A wild Pokémon appears!")
     display_name, pokemon, is_ditto = choose_pokemon()
     reveal(f"You encountered a {display_name} (Type: {pokemon['type']}).")
     
     cumulative_flee = 0.0
     attempt_count = 0
+    
+    # Show how many Pokeballs player has
+    reveal(f"You have {remaining_pokeballs} Pokéball(s) remaining.")
 
-    while True:
+    while remaining_pokeballs > 0:
         reveal("\nChoose your throw:")
         reveal("1: Throw Lightly")
         reveal("2: Throw Precisely")
         reveal("3: Throw Masterfully")
         reveal("4: Throw Desperately")
         throw_type = input("Enter your choice (1, 2, 3 or 4): ").strip()
+        
+        remaining_pokeballs -= 1 
         outcome, throw_flee_adjust = simulate_throw(pokemon, throw_type, cumulative_flee)
 
         if outcome == "caught":
@@ -143,13 +153,14 @@ def main():
                 reveal(f"\nwait a second, that's not a {display_name}...")
                 reveal(f"\n?!?!?! {display_name} is tranforming !!!  What?!?!")
                 reveal(f"\nTurns out ......")
-                reveal("Its is a DITTO!!!!!!")
+                reveal("It is a DITTO!!!!!!")
+                return "Ditto", True, True
             else:
                 reveal(f"\n⭐⭐ Congratulations! You caught the {display_name}! ⭐⭐")
-            break
+                return display_name, True, False
         elif outcome == "fled":
             reveal(f"\nOh no! The {display_name} fled. Better luck next time!")
-            break
+            return display_name, False, False
         else:
             reveal(f"\nThe {display_name} broke out of the ball! Try again.")
             if attempt_count >= 1:
@@ -158,6 +169,30 @@ def main():
                 cumulative_flee = throw_flee_adjust
             cumulative_flee = min(cumulative_flee, 100.0)
             attempt_count += 1
+            
+            # Check if player is out of pokeballs
+            if remaining_pokeballs <= 0:
+                reveal("You're out of Pokéballs!")
+                return display_name, False, False
+            reveal(f"You have {remaining_pokeballs} Pokéball(s) remaining.")
+    
+    reveal("You don't have any Pokéballs left!")
+    return display_name, False, False
+
+#For direct execution
+def main():
+    # Default pokeballs when running standalone
+    global remaining_pokeballs
+    remaining_pokeballs = 10
+    pokemon_name, caught, is_ditto = catch_pokemon(remaining_pokeballs)
+    if caught:
+        if is_ditto:
+            print(f"You caught a Ditto disguised as {pokemon_name}!")
+        else:
+            print(f"You caught {pokemon_name}!")
+    else:
+        print(f"Failed to catch {pokemon_name}.")
+    print(f"Remaining pokeballs: {remaining_pokeballs}")
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,11 @@
 import random
 import sys
 import time
+import os
+
+# Linked modules
+import beatrice
+import dahlia
 
 def reveal(text, delay=0.05):
     for char in text:
@@ -17,7 +22,58 @@ class Player:
         self.pokeballs = 0
         self.pokemons = {}      # Example: {"Chansey": 1, "Pikachu": 2}
         self.bag = {}           # Example: {"Potion": 5, "Antidote": 3}
+        
+        if not self.profile_exists(): 
+            self.register_profile()
+        else: 
+            self.login_profile()
+
+    def profile_exists(self):
+        """Check if profile file exists"""
+        return os.path.isfile(self.filename)
+    
+    def register_profile(self):
+        """Register a new profile when no sav file exists."""
+        reveal("Welcome to Pokémon Terminal GO!", 0.03)
+        reveal("No existing profile found. Let's create one!", 0.03)
+
+        #Get player name
+        while True: 
+            name = input("Enter your trainer name: ").strip()
+            if name and len(name) <= 20:
+                self.name = name
+                break
+            else:
+                print("Please enter a valid name (up to 20 characters).")
+        
+        self.ID = str(random.randint(10000, 99999)) 
+
+        #Hidden
+        special_name = "KaiC"
+        if special_name in self.name:
+            self.pokeballs = 9999
+            self.pokemons = {"Shiny Pikachu": 1}
+            print("\033[33m⚡ Special account initialized! ⚡\033[0m")
+        else:
+            self.pokeballs = 10
+            self.pokemons = {"Pikachu": 1}
+
+        self.save_profile()
+
+        reveal(f"\nWelcome, {self.name}! Your Trainer ID is: {self.ID}", 0.03)
+        if "Shiny" in next(iter(self.pokemons.keys()), ""):
+            reveal("\033[33mYou've received a ✨SHINY✨ Pikachu as your starter Pokémon!\033[0m", 0.03)
+        else:
+            reveal("You've received a Pikachu as your starter Pokémon!", 0.03)
+        reveal(f"You've also received {self.pokeballs} Pokéballs to start your journey!", 0.03)
+        input("Press Enter to continue...")
+
+    def login_profile(self):
+        """Load existing user data from file"""
+        reveal("Loading profile...", 0.03)
         self.load_profile()
+        reveal(f"Welcome back, {self.name}!", 0.03)
+        time.sleep(1)
 
     def encode_number(self, number):
         """Encodes a number using a simple substitution cipher."""
@@ -186,12 +242,50 @@ class Game:
         reveal("3. Back to Worlds", 0.02)
         city_choice = input("Choose a city (1-3): ").strip()
         if city_choice in ["1", "2"]:
-            print("You ventured into the city... (feature coming soon)")
+            if self.player.pokeballs <= 0: 
+                print("You have no Pokeballs left! Visit the shop to buy more.")
+                return
+            
+            print("You walked into the tall grass...")
+            time.sleep(1)
+
+            try: 
+                print("The grass is rustling...")
+                beatrice.animate_bush(duration=3) #Bush animation
+
+                pokemon_name, caught = self.start_encounter() #Dahlia catch
+                if caught:
+                    self.player.add_pokemon(pokemon_name)
+                    print(f"You caught {pokemon_name}!")
+            except KeyboardInterrupt:
+                print("\nYou backed away from the grass...")
+
         elif city_choice == "3":
             return  # Back to Worlds menu
         else:
             print("Invalid selection, returning to Worlds.")
         print()
+
+    def start_encounter(self):
+        if self.player.pokeballs <= 0:
+            print("You're out of Pokéballs!")
+            return None, False
+            
+        # Initial pokeballs count
+        initial_pokeballs = self.player.pokeballs
+        
+        pokemon_name, caught, is_ditto = dahlia.catch_pokemon(self.player.pokeballs)
+        
+        # Ditto check
+        if is_ditto and caught:
+            pokemon_name = "Ditto"
+        
+        # Calculate remaining pokeballs
+        pokeballs_used = initial_pokeballs - dahlia.remaining_pokeballs
+        self.player.pokeballs = dahlia.remaining_pokeballs
+        self.player.save_profile()
+        
+        return pokemon_name, caught
 
     def pokemon_list(self):
         print("=== Pokémon List ===")
