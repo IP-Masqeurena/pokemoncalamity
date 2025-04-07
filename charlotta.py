@@ -1,4 +1,14 @@
 import random
+import sys
+import time
+
+
+def reveal(text, delay=0.05):
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    print()
 
 # Define base multipliers
 POKEBALL_MULTIPLIER = 1.0
@@ -30,22 +40,22 @@ def simulate_throw(pokemon, throw_type):
     catch_multiplier = POKEBALL_MULTIPLIER
     flee_rate_adjustment = 0.0
 
-    if throw_type.lower() == "lightly":
+    if throw_type == "1":
         # Throw lightly: half the pokeball multiplier.
         catch_multiplier *= 0.5
         # No change to flee rate.
-    elif throw_type.lower() == "precisely":
+    elif throw_type == "2":
         # Reduce catch multiplier by 20%
         catch_multiplier *= 0.8
         # Increase flee rate by 5%
         flee_rate_adjustment = 5.0
-    elif throw_type.lower() == "desperately":
+    elif throw_type == "3":
         # Increase catch multiplier by 10%
         catch_multiplier *= 1.1
         # Increase flee rate by 20%
         flee_rate_adjustment = 20.0
     else:
-        print("Invalid throw type. Defaulting to normal throw.")
+        reveal("Invalid throw type. Defaulting to normal throw.")
     
     # Total effective catch multiplier includes the medal bonus.
     effective_multiplier = catch_multiplier + MEDAL_MULTIPLIER
@@ -61,10 +71,10 @@ def simulate_throw(pokemon, throw_type):
     flee_roll = random.uniform(0, 100)
     catch_roll = random.uniform(0, 100)
 
-    print(f"\nThrow Type: {throw_type.capitalize()}")
-    print(f"Effective Catch Chance: {effective_catch_chance:.2f}%")
-    print(f"Effective Flee Chance: {effective_flee_chance:.2f}%")
-    print(f"Flee Roll: {flee_roll:.2f} | Catch Roll: {catch_roll:.2f}")
+    reveal(f"\nThrow Type: {throw_type.capitalize()}")
+    reveal(f"Effective Catch Chance: {effective_catch_chance:.2f}%")
+    reveal(f"Effective Flee Chance: {effective_flee_chance:.2f}%")
+    reveal(f"Flee Roll: {flee_roll:.2f} | Catch Roll: {catch_roll:.2f}")
 
     # Check outcomes: if Pokémon flees, it happens first.
     if flee_roll <= effective_flee_chance:
@@ -75,22 +85,22 @@ def simulate_throw(pokemon, throw_type):
         return "break out"
 
 def main():
-    print("A wild Pokémon appears!")
+    reveal("A wild Pokémon appears!")
     name, pokemon = choose_pokemon()
-    print(f"You encountered a {name} (Type: {pokemon['type']}).")
+    reveal(f"You encountered a {name} (Type: {pokemon['type']}).")
 
     while True:
         throw_type = input("\nChoose your throw (lightly, precisely, desperately): ").strip()
         outcome = simulate_throw(pokemon, throw_type)
 
         if outcome == "caught":
-            print(f"\nCongratulations! You caught the {name}!")
+            reveal(f"\nCongratulations! You caught the {name}!")
             break
         elif outcome == "fled":
-            print(f"\nOh no! The {name} fled. Better luck next time!")
+            reveal(f"\nOh no! The {name} fled. Better luck next time!")
             break
         else:
-            print(f"\nThe {name} broke out of the ball! Try again.")
+            reveal(f"\nThe {name} broke out of the ball! Try again.")
 
 if __name__ == "__main__":
     main()
