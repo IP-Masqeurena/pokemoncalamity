@@ -12,7 +12,7 @@ def reveal(text, delay=0.05):
 # Define base multipliers
 POKEBALL_MULTIPLIER = 1.0
 MEDAL_MULTIPLIER = 1.0
-
+TYPE_MULTIPLIER = 1.0  
 # Define Pokémon with their attributes.
 # catch_rate and flee_rate are percentages between 0.1 and 100.
 pokemon_data = {
@@ -79,7 +79,8 @@ def simulate_throw(pokemon, throw_type, cumulative_flee):
         throw_flee_adjust = 0.0
         throw_name = "normal"
 
-    effective_multiplier = catch_multiplier + MEDAL_MULTIPLIER
+    bonus_multiplier = MEDAL_MULTIPLIER + TYPE_MULTIPLIER
+    effective_multiplier = catch_multiplier + bonus_multiplier
 
     effective_catch_chance = pokemon["catch_rate"] * effective_multiplier
     effective_flee_chance = pokemon["flee_rate"] + throw_flee_adjust + cumulative_flee
