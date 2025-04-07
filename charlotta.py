@@ -12,6 +12,7 @@ def reveal(text, delay=0.05):
 # Define base multipliers
 POKEBALL_MULTIPLIER = 1.0
 MEDAL_MULTIPLIER = 1.0
+TYPE_MULTIPLIER = 1.0  
 
 # Define Pokémon with their attributes
 # catch_rate and flee_rate are percentages between 0.1 and 100.
@@ -19,7 +20,7 @@ pokemon_data = {
     "Chansey": {"type": "Normal", "catch_rate": 95.0, "flee_rate": 2.0},
     "Eevee": {"type": "Normal", "catch_rate": 85.0, "flee_rate": 5.0},
     "Mimikyu": {"type": "Ghost/Fairy", "catch_rate": 75.0, "flee_rate": 20.0},
-    "Rayquaza": {"type": "Flying/Dragon", "catch_rate": 15.0, "flee_rate": 30.0}
+    "Rayquaza": {"type": "Flying/Dragon", "catch_rate": 1.0, "flee_rate": 30.0}
 }
 
 # Spawn probabilities (weights) - for example, Rayquaza is the rarest.
@@ -27,7 +28,7 @@ spawn_weights = {
     "Chansey": 50,
     "Eevee": 35,
     "Mimikyu": 10,
-    "Rayquaza": 5
+    "Rayquaza": 500000000000
 }
 
 def choose_pokemon():
@@ -74,7 +75,8 @@ def simulate_throw(pokemon, throw_type, cumulative_flee):
         throw_name = "normal"
 
     # Apply the medal bonus each throw (catch multiplier does not stack across throws).
-    effective_multiplier = catch_multiplier + MEDAL_MULTIPLIER
+    bonus_multiplier = MEDAL_MULTIPLIER + TYPE_MULTIPLIER
+    effective_multiplier = catch_multiplier + bonus_multiplier
 
     # Calculate effective catch and flee chances.
     effective_catch_chance = pokemon["catch_rate"] * effective_multiplier
