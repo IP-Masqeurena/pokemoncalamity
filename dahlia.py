@@ -138,8 +138,11 @@ def main():
         if outcome == "caught":
             if is_ditto:
                 reveal(f"\n⭐⭐ Congratulations! You caught the {display_name}! ⭐⭐")
-                reveal(f"\nOh? This is not {display_name}...")
-                reveal("This is a Ditto!!!!!!")
+                reveal(f"\nOh? {display_name} is behaving weirdly...")
+                reveal(f"\nwait a second, that's not a {display_name}...")
+                reveal(f"\n?!?!?! {display_name} is tranforming !!!  What?!?!")
+                reveal(f"\nTurns out ......")
+                reveal("Its is a DITTO!!!!!!")
             else:
                 reveal(f"\n⭐⭐ Congratulations! You caught the {display_name}! ⭐⭐")
             break
