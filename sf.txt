@@ -1,0 +1,8 @@
+Name: Player
+ID: 82683
+Pokeballs: 303
+Pikachu: 1
+Chansey: 3
+Eevee: 1
+Ditto: 2
+Vanguard: 878

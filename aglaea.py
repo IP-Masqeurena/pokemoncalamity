@@ -157,6 +157,7 @@ class Game:
         city_choice = input("Choose a city (1-3): ").strip()
         if city_choice in ["1", "2"]:
             # Start a wild encounter (calling our catch process).
+            
             wild_encounter(self.player)
         elif city_choice == "3":
             return
