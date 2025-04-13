@@ -2,7 +2,7 @@
 import random
 import sys
 import time
-from gaia import pokemon_data, spawn_weights, POKEBALL_MULTIPLIER, MEDAL_MULTIPLIER, TYPE_MULTIPLIER
+from gaia import area_data, POKEBALL_MULTIPLIER, MEDAL_MULTIPLIER, TYPE_MULTIPLIER
 
 def reveal(text, delay=0.05):
     """Prints text with a typing effect."""
@@ -12,23 +12,30 @@ def reveal(text, delay=0.05):
         time.sleep(delay)
     print()
 
-def choose_pokemon():
+def choose_pokemon(area_name):
     """Randomly selects a wild Pokémon using spawn weights.
     
     If Ditto is chosen, a fake name from another Pokémon is used for display.
     Returns a tuple (display_name, pokemon_stats, is_ditto).
     """
-    names = list(pokemon_data.keys())
-    weights = [spawn_weights[name] for name in names]
+    area_info = area_data.get(area_name)
+    if not area_info:
+        reveal("Area data not found. Defaulting to first available area.")
+        # Fallback: choose the first area in area_data.
+        area_info = list(area_data.values())[0]
+
+    pokemon_data_local = area_info["pokemon_data"]
+    spawn_weights_local = area_info["spawn_weights"]
+
+    names = list(pokemon_data_local.keys())
+    weights = [spawn_weights_local[name] for name in names]
     chosen = random.choices(names, weights=weights, k=1)[0]
-    is_ditto = False
-    if chosen == "Ditto":
-        fake_names = [name for name in names if name != "Ditto"]
-        display_name = random.choice(fake_names)
-        is_ditto = True
-    else:
-        display_name = chosen
-    return display_name, pokemon_data[chosen], is_ditto
+    
+    # (Optional: add any Ditto check here if necessary)
+    is_ditto = (chosen == "Ditto")
+    display_name = chosen  # or use a fake name for Ditto if desired.
+    
+    return display_name, pokemon_data_local[chosen], is_ditto
 
 def simulate_throw(player, pokemon, throw_type, cumulative_flee):
     """
@@ -114,7 +121,7 @@ def simulate_throw(player, pokemon, throw_type, cumulative_flee):
                 return "break out", throw_flee_adjust
     return "caught", throw_flee_adjust
 
-def wild_encounter(player):
+def wild_encounter(player, area_name):
     """
     Handles a wild Pokémon encounter. The encounter continues until the Pokémon
     is either caught or flees. After a catch or a flee, the player is asked if they want
@@ -125,7 +132,7 @@ def wild_encounter(player):
     exploring = True
     while exploring:
         reveal("A wild Pokémon appears!")
-        display_name, pokemon, is_ditto = choose_pokemon()
+        display_name, pokemon, is_ditto = choose_pokemon(area_name)
         reveal(f"You encountered a {display_name} (Type: {pokemon['type']}).")
 
         cumulative_flee = 0.0
@@ -155,10 +162,12 @@ def wild_encounter(player):
                     reveal("\nWait a second... That's not a " + display_name + "...")
                     reveal("\n?!?!?! " + display_name + " is transforming!!!")
                     reveal("\nTurns out... It's a DITTO!!!!!!")
-                    player.add_pokemon("Ditto")
+                    # Assume Ditto’s type is Normal.
+                    player.add_pokemon("Ditto", "Normal")
                 else:
                     reveal(f"\n⭐⭐ Congratulations! You caught the {display_name}! ⭐⭐")
-                    player.add_pokemon(display_name)
+                    # Provide the actual type from the pokemon's data.
+                    player.add_pokemon(display_name, pokemon["type"])
                 break
             elif outcome == "fled":
                 reveal(f"\nOh no! The {display_name} fled. Better luck next time!")

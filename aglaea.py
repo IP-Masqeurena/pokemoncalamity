@@ -1,4 +1,3 @@
-# main.py
 import random
 import sys
 import time
@@ -19,8 +18,14 @@ class Player:
         self.name = "Player"
         self.ID = None
         self.pokeballs = 10
-        self.pokemons = {}
-        self.bag = {}
+        self.pokemons = {}          # Pokémon caught: e.g., {"Pikachu": 1, ...}
+        # New attributes for catches tracking and stats:
+        self.total_catches = 0      # overall number of successful catches
+        self.catches_by_type = {}   # e.g., {"Fire": 3, "Water": 2, ...}
+        self.xp = 0                 # XP gained (1 XP per catch)
+        self.level = 1              # starting level
+        self.hp = 3                 # starting HP (level + 2)
+        self.spd = 10               # starting SPD (10 at level 1, +1 per level)
         self.load_profile()
 
     def encode_number(self, number):
@@ -28,54 +33,151 @@ class Player:
         ENCODE_MAP = ['7', '0', '9', '8', '6', '2', '5', '3', '1', '4']
         return ''.join(ENCODE_MAP[int(d)] for d in str(number))
 
+    def check_level_up(self):
+        """Checks and applies level-up based on XP.
+           Level thresholds: 
+             level 1→2: 10 XP, level 2→3: 15 XP, level 3→4: 20 XP, etc.
+           For every level up, increase level by 1 and recalc HP and SPD.
+           HP is recalculated as (level + 2) and SPD as 10 + (level - 1).
+        """
+        threshold = 10 + (self.level - 1) * 5
+        while self.xp >= threshold:
+            self.xp -= threshold
+            self.level += 1
+            self.hp = self.level + 2
+            self.spd = 10 + (self.level - 1)
+            threshold = 10 + (self.level - 1) * 5
+
+    def add_pokemon(self, pokemon_name, poke_type, count=1):
+        """Records that the player caught a Pokémon and updates statistics.
+           Awards 1 XP per catch, increments overall catches and type counts,
+           then checks for level-up.
+        """
+        self.total_catches += count
+        # Update catches by type:
+        if poke_type in self.catches_by_type:
+            self.catches_by_type[poke_type] += count
+        else:
+            self.catches_by_type[poke_type] = count
+        # Update the Pokémon caught list:
+        self.pokemons[pokemon_name] = self.pokemons.get(pokemon_name, 0) + count
+        # Award 1 XP per catch and check for level-up:
+        self.xp += 10
+        self.check_level_up()
+        self.save_profile()
+
     def load_profile(self):
-        """Loads player data from a save file. Creates one with defaults if not found."""
+        """
+        Loads player data from the save file in a neat, sectioned format.
+        
+        Global:
+          Name, ID, Pokeballs
+
+        -- Player Stats --
+          Level, XP, HP, SPD, Vanguard.
+
+        -- Catches --
+          Total Catches, then individual type counts.
+
+        -- Pokemon Caught --
+          Each Pokémon caught.
+        """
+        if not os.path.exists(self.filename):
+            # File does not exist so create with defaults.
+            self.ID = str(random.randint(10000, 99999))
+            self.save_profile()
+            return
+
+        current_section = "global"
         try:
             with open(self.filename, "r") as f:
-                lines = f.readlines()
-            # Parse lines in "Key: Value" format.
-            for line in lines:
-                line = line.strip()
-                if not line or ": " not in line:
-                    continue
-                key, value = line.split(": ", 1)
-                if key.lower() == "name":
-                    self.name = value
-                elif key.lower() == "id":
-                    self.ID = value
-                elif key.lower() == "pokeballs":
-                    self.pokeballs = int(value)
-                elif key.lower() == "vanguard":
-                    # Skipping verification for now.
-                    pass
-                else:
-                    # Any other key is assumed to be a caught Pokémon.
-                    self.pokemons[key] = int(value)
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # Detect section headers.
+                    if line.startswith("--"):
+                        if "Player Stats" in line:
+                            current_section = "stats"
+                        elif "Catches" in line:
+                            current_section = "catches"
+                        elif "Pokemon Caught" in line:
+                            current_section = "pokemons"
+                        else:
+                            current_section = ""
+                        continue
+
+                    if ": " in line:
+                        key, value = line.split(": ", 1)
+                        if current_section == "global":
+                            if key == "Name":
+                                self.name = value
+                            elif key == "ID":
+                                self.ID = value
+                            elif key == "Pokeballs":
+                                self.pokeballs = int(value)
+                        elif current_section == "stats":
+                            if key == "Level":
+                                self.level = int(value)
+                            elif key == "XP":
+                                self.xp = int(value)
+                            elif key == "HP":
+                                self.hp = int(value)
+                            elif key == "SPD":
+                                self.spd = int(value)
+                            # Vanguard is saved but not used here.
+                        elif current_section == "catches":
+                            if key == "Total Catches":
+                                self.total_catches = int(value)
+                            else:
+                                # Here assume any key is a type name.
+                                self.catches_by_type[key] = int(value)
+                        elif current_section == "pokemons":
+                            self.pokemons[key] = int(value)
         except Exception:
-            # Create default profile if file cannot be read.
+            # In case of error, reinitialize with defaults.
             self.name = "Player"
             self.ID = str(random.randint(10000, 99999))
             self.pokeballs = 10
-            self.pokemons = {"Pikachu": 1}  # Starter Pokémon.
+            self.pokemons = {}
+            self.total_catches = 0
+            self.catches_by_type = {}
+            self.xp = 0
+            self.level = 1
+            self.hp = 3
+            self.spd = 10
             self.save_profile()
 
     def save_profile(self):
-        """Saves player data back to the save file."""
+        """Saves player data into the save file, using a neat, sectioned format."""
         verification = self.encode_number(self.pokeballs)
         with open(self.filename, "w") as f:
-            f.write("Name: " + self.name + "\n")
+            # Global section.
+            f.write(f"Name: {self.name}\n")
             if self.ID is None:
                 self.ID = str(random.randint(10000, 99999))
-            f.write("ID: " + self.ID + "\n")
-            f.write("Pokeballs: " + str(self.pokeballs) + "\n")
+            f.write(f"ID: {self.ID}\n")
+            f.write(f"Pokeballs: {self.pokeballs}\n\n")
+            
+            # Player Stats section (moved above the other sections).
+            f.write("-- Player Stats --\n")
+            f.write(f"Level: {self.level}\n")
+            f.write(f"XP: {self.xp}\n")
+            f.write(f"HP: {self.hp}\n")
+            f.write(f"SPD: {self.spd}\n")
+            f.write(f"Vanguard: {verification}\n\n")
+            
+            # Catches section.
+            f.write("-- Catches --\n")
+            f.write(f"Total Catches: {self.total_catches}\n")
+            for poke_type, count in self.catches_by_type.items():
+                f.write(f"{poke_type}: {count}\n")
+            f.write("\n")
+            
+            # Pokemon Caught section.
+            f.write("-- Pokemon Caught --\n")
             for name, count in self.pokemons.items():
-                f.write(name + ": " + str(count) + "\n")
-            f.write("Vanguard: " + verification + "\n")
-
-    def add_pokemon(self, pokemon_name, count=1):
-        """Records that the player caught a Pokémon."""
-        self.pokemons[pokemon_name] = self.pokemons.get(pokemon_name, 0) + count
-        self.save_profile()
+                f.write(f"{name}: {count}\n")
 
 class Game:
     def __init__(self):
@@ -116,12 +218,19 @@ class Game:
         print("=== Profile ===")
         print("Name:", self.player.name)
         print("ID:", self.player.ID)
-        print("Pokémons:")
+        print("\nPokémons:")
         if self.player.pokemons:
             for name, count in self.player.pokemons.items():
                 print(f"{name} x{count}")
         else:
             print("None")
+        # Display additional stats.
+        print("\n-- Stats --")
+        print(f"Total Catches: {self.player.total_catches}")
+        print("Catches by Type:")
+        for ptype, count in self.player.catches_by_type.items():
+            print(f"{ptype}: {count}")
+        print(f"Level: {self.player.level}   XP: {self.player.xp}   HP: {self.player.hp}   SPD: {self.player.spd}")
         print()
 
     def worlds(self):
@@ -156,10 +265,26 @@ class Game:
             reveal("2. Mahogany", 0.02)
         reveal("3. Back to Worlds", 0.02)
         city_choice = input("Choose a city (1-3): ").strip()
-        if city_choice in ["1", "2"]:
-            # Start a wild encounter (calling our catch process).
-            
-            wild_encounter(self.player)
+        
+        # Standardized lookup: nested dictionary keyed by world.
+        area_lookup = {
+            "Aeos": {
+                "1": "Moonway Town",
+                "2": "Revolver City"
+            },
+            "Kanto": {
+                "1": "LittleRoot",
+                "2": "Viridian"
+            },
+            "Johto": {
+                "1": "GoldenRod",
+                "2": "Mahogany"
+            }
+        }
+        
+        if city_choice in area_lookup.get(world, {}):
+            area_name = area_lookup[world][city_choice]
+            wild_encounter(self.player, area_name)
         elif city_choice == "3":
             return
         else:
@@ -211,7 +336,6 @@ class Game:
             while True:
                 name = input("What is your name? ").strip()
                 if name:
-                    # Create a new player after getting a valid name
                     self.player = Player()
                     self.player.name = name
                     self.player.save_profile()
@@ -219,7 +343,6 @@ class Game:
                 else:
                     print("Please enter a valid name.")
         else:
-            # Existing player: load profile
             self.player = Player()
         while True:
             self.show_menu()
