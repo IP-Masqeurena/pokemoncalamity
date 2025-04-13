@@ -2,6 +2,7 @@
 import random
 import sys
 import time
+import os
 from fluerdylis import wild_encounter
 
 def reveal(text, delay=0.01):
@@ -16,10 +17,10 @@ class Player:
     def __init__(self, filename="sf.txt"):
         self.filename = filename
         self.name = "Player"
-        self.ID = None          # Will be a 5-digit string
-        self.pokeballs = 10     # Starting pokéballs
-        self.pokemons = {}      # Format: {"Chansey": 1, "Pikachu": 2}
-        self.bag = {}           # For future bag items.
+        self.ID = None
+        self.pokeballs = 10
+        self.pokemons = {}
+        self.bag = {}
         self.load_profile()
 
     def encode_number(self, number):
@@ -78,7 +79,7 @@ class Player:
 
 class Game:
     def __init__(self):
-        self.player = Player()
+        self.player = None
 
     def greet(self):
         reveal("=== Pokémon Terminal GO : Tester Version ===", 0.05)
@@ -204,6 +205,22 @@ class Game:
 
     def run(self):
         self.greet()
+        # Check if save file exists
+        if not os.path.exists("sf.txt"):
+            reveal("\nWelcome new Trainer!")
+            while True:
+                name = input("What is your name? ").strip()
+                if name:
+                    # Create a new player after getting a valid name
+                    self.player = Player()
+                    self.player.name = name
+                    self.player.save_profile()
+                    break
+                else:
+                    print("Please enter a valid name.")
+        else:
+            # Existing player: load profile
+            self.player = Player()
         while True:
             self.show_menu()
             choice = input("Select an option (1-7): ").strip()
