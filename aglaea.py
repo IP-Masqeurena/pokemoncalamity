@@ -2,7 +2,7 @@ import random
 import sys
 import time
 import os
-from fluerdylis import wild_encounter
+from fluerdylis import wild_encounter  # (Defined in catch.py)
 
 def reveal(text, delay=0.01):
     """Prints text with a typing effect."""
@@ -18,14 +18,19 @@ class Player:
         self.name = "Player"
         self.ID = None
         self.pokeballs = 10
-        self.pokemons = {}          # Pokémon caught: e.g., {"Pikachu": 1, ...}
-        # New attributes for catches tracking and stats:
+        self.pokemons = {}          # e.g., {"Pikachu": 1, ...}
+        # Tracking stats
         self.total_catches = 0      # overall number of successful catches
         self.catches_by_type = {}   # e.g., {"Fire": 3, "Water": 2, ...}
-        self.xp = 0                 # XP gained (1 XP per catch)
+        self.xp = 0                 # XP gained (10 XP per catch)
         self.level = 1              # starting level
-        self.hp = 3                 # starting HP (level + 2)
-        self.spd = 10               # starting SPD (10 at level 1, +1 per level)
+        self.hp = self.level + 2    # starting HP is level + 2
+        self.spd = 10 + (self.level - 1)  # starting SPD is 10, then +1 per level
+        self.acc = self.level + 15             # Base Accuracy stat
+        # Medals – stored as a dictionary.
+        # "Master Catch Medal": level (0–20)
+        # For each type caught, e.g., "Fire Medal": level (0–20)
+        self.medals = {}
         self.load_profile()
 
     def encode_number(self, number):
@@ -33,57 +38,65 @@ class Player:
         ENCODE_MAP = ['7', '0', '9', '8', '6', '2', '5', '3', '1', '4']
         return ''.join(ENCODE_MAP[int(d)] for d in str(number))
 
+    def update_medals(self):
+        """Recalculate medal levels based on catches.
+           - Master Catch Medal: level = min(total_catches // 100, 20)
+           - For each Pokémon type, level = min(catches_by_type[type] // 100, 20)
+        """
+        self.medals["Master Catch Medal"] = min(self.total_catches // 5, 20)
+        for ptype, count in self.catches_by_type.items():
+            medal_name = f"{ptype} Medal"
+            self.medals[medal_name] = min(count // 5, 20)
+
     def check_level_up(self):
         """Checks and applies level-up based on XP.
-           Level thresholds: 
-             level 1→2: 10 XP, level 2→3: 15 XP, level 3→4: 20 XP, etc.
-           For every level up, increase level by 1 and recalc HP and SPD.
-           HP is recalculated as (level + 2) and SPD as 10 + (level - 1).
+           Level thresholds: level 1→2: 10 XP, level 2→3: 15 XP, level 3→4: 20 XP, etc.
+           Recalculates HP, SPD, and ACC.
+           Immediately notifies the player when a level is gained.
         """
         threshold = 10 + (self.level - 1) * 5
+        initial_level = self.level
         while self.xp >= threshold:
             self.xp -= threshold
             self.level += 1
             self.hp = self.level + 2
             self.spd = 10 + (self.level - 1)
+            self.acc = self.level + 15
+            print(f"\n*** Congratulations! You've leveled up to Level {self.level}!")
             threshold = 10 + (self.level - 1) * 5
+        if self.level == initial_level:
+            print(f"> You still need {self.xp} more XP to level up.")
 
     def add_pokemon(self, pokemon_name, poke_type, count=1):
-        """Records that the player caught a Pokémon and updates statistics.
-           Awards 1 XP per catch, increments overall catches and type counts,
-           then checks for level-up.
-        """
+        """Records that the player caught a Pokémon, awards XP, updates medals, then saves profile."""
         self.total_catches += count
         # Update catches by type:
         if poke_type in self.catches_by_type:
             self.catches_by_type[poke_type] += count
         else:
             self.catches_by_type[poke_type] = count
-        # Update the Pokémon caught list:
+        # Update Pokémon list:
         self.pokemons[pokemon_name] = self.pokemons.get(pokemon_name, 0) + count
-        # Award 1 XP per catch and check for level-up:
+
+        # Award XP and update medals.
+        print(f"\n>>> You gained 10 XP!")
         self.xp += 10
         self.check_level_up()
+        self.update_medals()
         self.save_profile()
 
     def load_profile(self):
         """
         Loads player data from the save file in a neat, sectioned format.
         
-        Global:
-          Name, ID, Pokeballs
-
-        -- Player Stats --
-          Level, XP, HP, SPD, Vanguard.
-
-        -- Catches --
-          Total Catches, then individual type counts.
-
-        -- Pokemon Caught --
-          Each Pokémon caught.
+        Sections:
+          Global: Name, ID, Pokeballs
+          -- Player Stats --: Level, XP, HP, SPD, ACC, Vanguard.
+          -- Catches --: Total Catches and per-type counts.
+          -- Pokemon Caught --: Each Pokémon caught.
+          -- Medals --: Master Catch Medal and type medals.
         """
         if not os.path.exists(self.filename):
-            # File does not exist so create with defaults.
             self.ID = str(random.randint(10000, 99999))
             self.save_profile()
             return
@@ -95,7 +108,7 @@ class Player:
                     line = line.strip()
                     if not line:
                         continue
-                    # Detect section headers.
+                    # Change section based on header
                     if line.startswith("--"):
                         if "Player Stats" in line:
                             current_section = "stats"
@@ -103,10 +116,11 @@ class Player:
                             current_section = "catches"
                         elif "Pokemon Caught" in line:
                             current_section = "pokemons"
+                        elif "Medals" in line:
+                            current_section = "medals"
                         else:
                             current_section = ""
                         continue
-
                     if ": " in line:
                         key, value = line.split(": ", 1)
                         if current_section == "global":
@@ -125,17 +139,22 @@ class Player:
                                 self.hp = int(value)
                             elif key == "SPD":
                                 self.spd = int(value)
-                            # Vanguard is saved but not used here.
+                            elif key == "ACC":
+                                self.acc = int(value)
                         elif current_section == "catches":
                             if key == "Total Catches":
                                 self.total_catches = int(value)
                             else:
-                                # Here assume any key is a type name.
                                 self.catches_by_type[key] = int(value)
                         elif current_section == "pokemons":
                             self.pokemons[key] = int(value)
+                        elif current_section == "medals":
+                            # Medal levels stored as integers.
+                            self.medals[key] = int(value)
+            # Update medals in case catches have changed.
+            self.update_medals()
         except Exception:
-            # In case of error, reinitialize with defaults.
+            # On error, reinitialize defaults.
             self.name = "Player"
             self.ID = str(random.randint(10000, 99999))
             self.pokeballs = 10
@@ -144,12 +163,15 @@ class Player:
             self.catches_by_type = {}
             self.xp = 0
             self.level = 1
-            self.hp = 3
-            self.spd = 10
+            self.hp = self.level + 2
+            self.spd = 10 + (self.level - 1)
+            self.acc = self.level + 15
+            self.medals = {}
+            self.update_medals()
             self.save_profile()
 
     def save_profile(self):
-        """Saves player data into the save file, using a neat, sectioned format."""
+        """Saves all player data into the save file using sections."""
         verification = self.encode_number(self.pokeballs)
         with open(self.filename, "w") as f:
             # Global section.
@@ -159,12 +181,13 @@ class Player:
             f.write(f"ID: {self.ID}\n")
             f.write(f"Pokeballs: {self.pokeballs}\n\n")
             
-            # Player Stats section (moved above the other sections).
+            # Player Stats section.
             f.write("-- Player Stats --\n")
             f.write(f"Level: {self.level}\n")
             f.write(f"XP: {self.xp}\n")
             f.write(f"HP: {self.hp}\n")
             f.write(f"SPD: {self.spd}\n")
+            f.write(f"ACC: {self.acc}\n")
             f.write(f"Vanguard: {verification}\n\n")
             
             # Catches section.
@@ -178,6 +201,16 @@ class Player:
             f.write("-- Pokemon Caught --\n")
             for name, count in self.pokemons.items():
                 f.write(f"{name}: {count}\n")
+            f.write("\n")
+            
+            # Medals section.
+            f.write("-- Medals --\n")
+            # Master Catch Medal
+            f.write(f"Master Catch Medal: {self.medals.get('Master Catch Medal', 0)}\n")
+            # Write type medals if any.
+            for key in self.medals:
+                if key != "Master Catch Medal":
+                    f.write(f"{key}: {self.medals[key]}\n")
 
 class Game:
     def __init__(self):
@@ -207,7 +240,7 @@ class Game:
         print("2. Quit")
         option = input("Select an option (1-2): ").strip()
         if option == "1":
-            return  # Back to main menu.
+            return
         elif option == "2":
             print("Goodbye!")
             sys.exit()
@@ -224,13 +257,20 @@ class Game:
                 print(f"{name} x{count}")
         else:
             print("None")
-        # Display additional stats.
         print("\n-- Stats --")
         print(f"Total Catches: {self.player.total_catches}")
         print("Catches by Type:")
         for ptype, count in self.player.catches_by_type.items():
             print(f"{ptype}: {count}")
-        print(f"Level: {self.player.level}   XP: {self.player.xp}   HP: {self.player.hp}   SPD: {self.player.spd}")
+        print(f"Level: {self.player.level}   XP: {self.player.xp}   HP: {self.player.hp}   SPD: {self.player.spd}   ACC: {self.player.acc}")
+        print("\n-- Medals --")
+        master_level = self.player.medals.get("Master Catch Medal", 0)
+        print(f"Master Catch Medal: LV {master_level} (Bonus: {master_level * 0.1:.1f})")
+        # Show medals for each type if available.
+        for key in sorted(self.player.medals):
+            if key != "Master Catch Medal":
+                level = self.player.medals[key]
+                print(f"{key}: LV {level} (Bonus: {level * 0.1:.1f})")
         print()
 
     def worlds(self):
@@ -265,23 +305,11 @@ class Game:
             reveal("2. Mahogany", 0.02)
         reveal("3. Back to Worlds", 0.02)
         city_choice = input("Choose a city (1-3): ").strip()
-        
-        # Standardized lookup: nested dictionary keyed by world.
         area_lookup = {
-            "Aeos": {
-                "1": "Moonway Town",
-                "2": "Revolver City"
-            },
-            "Kanto": {
-                "1": "LittleRoot",
-                "2": "Viridian"
-            },
-            "Johto": {
-                "1": "GoldenRod",
-                "2": "Mahogany"
-            }
+            "Aeos": {"1": "Moonway Town", "2": "Revolver City"},
+            "Kanto": {"1": "LittleRoot", "2": "Viridian"},
+            "Johto": {"1": "GoldenRod", "2": "Mahogany"}
         }
-        
         if city_choice in area_lookup.get(world, {}):
             area_name = area_lookup[world][city_choice]
             wild_encounter(self.player, area_name)
@@ -330,7 +358,7 @@ class Game:
 
     def run(self):
         self.greet()
-        # Check if save file exists
+        # Create or load profile.
         if not os.path.exists("sf.txt"):
             reveal("\nWelcome new Trainer!")
             while True:
