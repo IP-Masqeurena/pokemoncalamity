@@ -42,32 +42,49 @@ def hp_bar(current, maximum, bar_length=20):
     bar += "░" * empty_length
     return bar
 
-def print_box(title, lines):
+def get_box_lines(title, lines):
     """
-    Prints a box with a title and content lines (list of strings).
-    Properly accounts for ANSI color codes so alignment doesn't break.
+    Generates a list of strings representing a box with a title and content lines.
+    The box respects ANSI codes by stripping them only for width calculation.
     """
-    # First, strip ANSI codes when measuring content width:
+    # Remove ANSI codes when measuring content width:
     stripped_title = strip_ansi_codes(title)
     stripped_lines = [strip_ansi_codes(line) for line in lines]
-    # Build content lines with a leading/trailing space
+    # Add padding spaces around each content line
     content = [f" {line} " for line in lines]
+    # Determine the necessary width.
+    content_widths = [len(strip_ansi_codes(c)) for c in content]
+    width = max(len(stripped_title) + 4, max(content_widths) if content_widths else 0)
     
-    width = max(len(stripped_title) + 4, max(len(s) for s in [f" {ln} " for ln in stripped_lines]))  
     top = "┌" + "─" * width + "┐"
     mid_title = f"│ {title.center(width - 2)} │"
     sep = "├" + "─" * width + "┤"
-    
-    print(top)
-    print(mid_title)
-    print(sep)
+    body = []
     for line in content:
-        # Right-pad the line to match the box width. 
-        # (Strip ANSI codes for length, but keep them in the actual printed string)
         stripped_len = len(strip_ansi_codes(line))
         padding = width - stripped_len
-        print("│" + line + " " * padding + "│")
-    print("└" + "─" * width + "┘")
+        body.append("│" + line + " " * padding + "│")
+    bottom = "└" + "─" * width + "┘"
+    # Return all lines as a list.
+    return [top, mid_title, sep] + body + [bottom]
+
+def print_boxes_side_by_side(box1_lines, box2_lines, space=4):
+    """
+    Takes two lists of strings (each representing a box) and prints them side by side.
+    Extra space is inserted between boxes.
+    """
+    # Determine how many lines each box has; pad the shorter one with empty lines if needed.
+    max_lines = max(len(box1_lines), len(box2_lines))
+    box1 = box1_lines + [" " * len(strip_ansi_codes(box1_lines[0]))] * (max_lines - len(box1_lines))
+    box2 = box2_lines + [" " * len(strip_ansi_codes(box2_lines[0]))] * (max_lines - len(box2_lines))
+    
+    for line1, line2 in zip(box1, box2):
+        print(line1 + " " * space + line2)
+
+def print_box(title, lines):
+    """Fallback function to print a single box (not used in side-by-side mode)."""
+    for line in get_box_lines(title, lines):
+        print(line)
 
 # --- Global constants and initial stats ---
 MAX_TURNS = 20
@@ -177,6 +194,7 @@ def player_move():
         "Throw a Rock (50% chance to reset boss's charge; on failure boss gains 4 leaps)",
         "Throw an Ultraball (attempt to catch Shadow Gyarados)"
     ]
+    # Using the existing print_box function to display moves vertically.
     print_box("Your Moves", [f"{i+1}. {moves[i]}" for i in range(len(moves))])
     move = input("Enter the number of your move (1-4): ").strip()
     if move == "1":
@@ -207,15 +225,18 @@ def player_move():
     else:
         reveal("Invalid move. You lose your turn!")
 
-# --- Display current status ---
-def display_status(turns_left):
+# --- Display current status side by side ---
+def display_status(turns_left, current_turn):
     clear_screen()
+    # Prepare boss data with additional turn info
     boss_lines = [
         f"Turns left: {turns_left}",
+        f"Turn: {current_turn}",
         f"Leap of Evolution: {leap}"
     ]
-    print_box("Boss Data: Shadow Gyarados", boss_lines)
+    boss_box = get_box_lines("Boss Data: Shadow Gyarados", boss_lines)
     
+    # Prepare player status data
     player_lines = [
         f"HP: {player_hp}/{PLAYER_MAX_HP} {hp_bar(player_hp, PLAYER_MAX_HP)}",
         f"Ultraballs: {ultraballs}",
@@ -224,7 +245,9 @@ def display_status(turns_left):
         f"Rocks thrown: {rocks_used}",
         f"Catch bonus: {berry_bonus:.2f}%"
     ]
-    print_box("Player Status", player_lines)
+    player_box = get_box_lines("Player Status", player_lines)
+    
+    print_boxes_side_by_side(boss_box, player_box)
     print()  # Extra spacing
 
 # --- Welcome instructions ---
@@ -255,9 +278,10 @@ def welcome_screen():
 def battle():
     global player_hp, leap, boss_caught
     current_turn = 1
-    
+
     while current_turn <= MAX_TURNS and not boss_caught and player_hp > 0:
-        display_status(MAX_TURNS - current_turn + 1)
+        turns_left = MAX_TURNS - current_turn + 1
+        display_status(turns_left, current_turn)
         print(f"--- Turn {current_turn} ---")
         
         # Player’s turn first if speeds are equal or player is faster
@@ -265,22 +289,17 @@ def battle():
             player_move()
             if boss_caught or player_hp <= 0:
                 break
-            if not boss_caught and player_hp > 0:
-                # Boss move
-                boss_move()
+            boss_move()
         else:
-            # Boss goes first if boss is faster
             boss_move()
             if boss_caught or player_hp <= 0:
                 break
-            if not boss_caught and player_hp > 0:
-                player_move()
+            player_move()
         
-        # Pause briefly so the player can read the outcome
         time.sleep(2)
         current_turn += 1
 
-    display_status(0)
+    display_status(0, current_turn)
     if boss_caught:
         reveal("\nBattle Over: You captured Shadow Gyarados!")
     elif player_hp <= 0:
